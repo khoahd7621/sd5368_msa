@@ -1,0 +1,102 @@
+Hello, I'm SD5368 - Hoang Dang Khoa
+Practical DevOps for Devs – Assignment
+# All these token will be INVALID!!!
+### I. Setting up a CI/CD Pipeline and deploying applications on AWS EKS
+-- Add Jenkins credentials
+github
+	<Your GitHub Username>
+	<Your GitHub Token>
+aws-credentials
+	<TokenID>
+	<Token>
+
+-- Add Jenkins shared library
+SharedLibrary URL: https://github.com/khoahd7621/sd5368_jenkins_shared_library.git
+	name: devops-jenkins-ci
+	path: ./
+	name: devops-jenkins-cd
+	path: ./cd/
+msa: https://github.com/khoahd7621/sd5368_msa.git
+
+-- Add Jenkins plugins
+Plugins
+	Docker
+	Docker Pipeline
+	Pipeline Utility Steps
+	Kubernetes
+	Kubernetes CLI
+	Pipeline: AWS Step
+
+practical_devops_sd5368_msa_backend_ci
+practical_devops_sd5368_msa_frontend_ci
+practical_devops_sd5368_msa_backend_cd
+practical_devops_sd5368_msa_frontend_cd
+
+aws eks --region us-east-1 update-kubeconfig --name practical-devops-sd5368-eks
+kubectl apply -f mongodb.yaml
+kubectl get pod
+kubectl get service
+kubectl port-forward service/frontend 3000:3000
+
+# Monitoring
+## Install CRD
+kubectl apply --server-side=true -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/bundle.yaml
+
+kubectl get crds
+
+## Install Prometheus
+kubectl create namespace prometheus
+
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+helm install prometheus prometheus-community/prometheus --namespace prometheus --set alertmanager.persistentVolume.storageClass="gp2" --set server.persistentVolume.storageClass="gp2"
+
+kubectl get all -n prometheus
+
+kubectl port-forward svc/prometheus-server -n prometheus 9000:80
+
+## Install Grafana
+kubectl create namespace grafana
+
+helm repo add grafana https://grafana.github.io/helm-charts
+
+helm install grafana grafana/grafana --namespace grafana --set persistence.storageClassName="gp2" --set persistence.enabled=true --set adminPassword='Pa55w0rd' --values ./deploy/grafana/grafana.yaml --set service.type=LoadBalancer
+
+kubectl get all --namespace=grafana
+
+kubectl port-forward service/grafana 3001:80 --namespace=grafana
+
+Dashboard ID: 6417
+
+### II. Reuse Jenkins CI and use GitOps for the CD pipeline
+===============================================================================
+## Setup ArgoCD
+kubectl get nodes
+
+kubectl create namespace argocd
+
+kubectl apply -n argocd -f  https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+kubectl get pods -n argocd
+
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"
+
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+kubectl create namespace app-argocd
+
+-- Create project mongo, backend and frontend
+-- Create app mongo, backend and frontend
+Application name: mongo
+Project: mongo
+Repository URL: https://github.com/khoahd7621/sd5368_msa.git
+Path: ./deploy/mongo
+Cluster: https://kubernetes.default.svc (this is the same cluster where ArgoCD is installed)
+Namespace: app-argocd
+...
+
+kubectl get pods -n app-argocd
+
+kubectl get services -n app-argocd
+
+kubectl port-forward svc/frontend 8888:3000 -n app-argocd
